@@ -121,3 +121,14 @@ func TestCPGEUStage0ListVersions(t *testing.T) {
 		t.Fatal(l[2])
 	}
 }
+
+func TestCPGEUStage0UploadErrors(t *testing.T) {
+	cl := NewCPGEUStage0Client(NewClientForTesting(), testBucket)
+
+	if err := cl.Upload("files/d", "x", "2019-01-01.00"); err != ErrInvalidVendor {
+		t.Fatal(err)
+	}
+	if err := cl.Upload("files/d", "goat", "201-01-01.00"); err != ErrInvalidVersion {
+		t.Fatal(err)
+	}
+}

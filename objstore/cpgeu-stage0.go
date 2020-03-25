@@ -55,7 +55,7 @@ func (c CPGEUStage0Client) ListVersions(vendor string) ([]CPGEUStage0Version, er
 	for i, info := range infos {
 		name := Base(info.Name)
 		if len(name) < 13 {
-			log.Printf("Invalid name in vendor version list: %s", info.Name)
+			log.Printf("Invalid name in version list: %s", info.Name)
 			continue
 		}
 		l[i] = CPGEUStage0Version{
@@ -74,8 +74,12 @@ func (c CPGEUStage0Client) Upload(
 	vendor string,
 	version string,
 ) error {
-	c.validateVendor(vendor)
-	validateVersion(version)
+	if err := c.validateVendor(vendor); err != nil {
+		return ErrInvalidVendor
+	}
+	if err := validateVersion(version); err != nil {
+		return ErrInvalidVersion
+	}
 	rPath := Join("stage0", vendor, version+".tar.gz")
 	return c.cl.PutDirTarGZ(srcDir, c.bucket, rPath)
 }
@@ -119,11 +123,11 @@ func (c CPGEUStage0Client) Unarchive(vendor, version string) error {
 
 // ----------------------------------------------------------------------------
 
-func (CPGEUStage0Client) validateVendor(vendor string) {
+func (CPGEUStage0Client) validateVendor(vendor string) error {
 	switch vendor {
 	case "chicken", "dingo", "goat", "toad":
-		return
+		return nil
 	default:
-		panic("Invalid vendor: " + vendor)
+		return ErrInvalidVendor
 	}
 }

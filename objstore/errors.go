@@ -9,6 +9,10 @@ import (
 var (
 	ErrPathNotFound   = errors.New("PathNotFound")
 	ErrBucketNotFound = errors.New("BucketNotFound")
+
+	ErrInvalidVendor  = errors.New("InvalidVendor")
+	ErrInvalidVersion = errors.New("InvalidVersion")
+	ErrInvalidDay     = errors.New("InvalidDay")
 )
 
 func convertError(err error) error {

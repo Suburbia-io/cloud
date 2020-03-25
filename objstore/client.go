@@ -1,7 +1,6 @@
 package objstore
 
-// TODO: PutDirTarGZ
-// TODO: GetDirTarGZ
+// TODO: Exists?
 
 import (
 	"archive/tar"
@@ -19,7 +18,6 @@ var (
 	defaultHost   = os.Getenv("SB_OBJSTORE_HOST")
 	defaultKey    = os.Getenv("SB_OBJSTORE_KEY")
 	defaultSecret = os.Getenv("SB_OBJSTORE_SECRET")
-	defaultBucket = os.Getenv("SB_OBJSTORE_BUCKET")
 	defaultEncKey = []byte(os.Getenv("SB_OBJSTORE_ENC_KEY"))
 )
 
@@ -27,7 +25,6 @@ type Client struct {
 	Host   string // Default from environment: SB_OBJSTORE_HOST
 	Key    string // Default from environment: SB_OBJSTORE_KEY
 	Secret string // Default from environment: SB_OBJSTORE_SECRET
-	Bucket string // Default from environment: SB_OBJSTORE_BUCKET
 	EncKey []byte // Default from environment: SB_OBJSTORE_ENC_KEY
 
 	cl *minio.Client
@@ -48,9 +45,6 @@ func (cl *Client) Connect() (err error) {
 	if cl.Secret == "" {
 		cl.Secret = defaultSecret
 	}
-	if cl.Bucket == "" {
-		cl.Bucket = defaultBucket
-	}
 	if len(cl.EncKey) == 0 {
 		cl.EncKey = defaultEncKey
 	}
@@ -64,41 +58,41 @@ func (cl *Client) Connect() (err error) {
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) Put(r io.Reader, rPath string) error {
+func (cl *Client) Put(r io.Reader, bucket, rPath string) error {
 	enc, err := encryptReader(cl.EncKey, r)
 	if err != nil {
 		return err
 	}
 
-	_, err = cl.cl.PutObject(cl.Bucket, rPath, enc, -1, minio.PutObjectOptions{})
+	_, err = cl.cl.PutObject(bucket, rPath, enc, -1, minio.PutObjectOptions{})
 	if err != nil {
-		log.Printf("Failed to put object %s/%s: %v", cl.Bucket, rPath, err)
+		log.Printf("Failed to put object %s/%s: %v", bucket, rPath, err)
 	}
-	return err
+	return convertError(err)
 }
 
 // ----------------------------------------------------------------------------
 
 // PutGZ: Like Put, but compresses the data stream before sending.
-func (cl *Client) PutGZ(r io.Reader, rPath string) error {
-	return cl.Put(gzipReader(r), rPath)
+func (cl *Client) PutGZ(r io.Reader, bucket, rPath string) error {
+	return cl.Put(gzipReader(r), bucket, rPath)
 }
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) PutFile(lPath, rPath string) error {
+func (cl *Client) PutFile(lPath, bucket, rPath string) error {
 	f, err := os.Open(lPath)
 	if err != nil {
 		log.Printf("Failed to open file: %v", lPath)
 		return err
 	}
 	defer f.Close()
-	return cl.Put(f, rPath)
+	return cl.Put(f, bucket, rPath)
 }
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) PutFileGZ(lPath, rPath string) error {
+func (cl *Client) PutFileGZ(lPath, bucket, rPath string) error {
 	f, err := os.Open(lPath)
 	if err != nil {
 		log.Printf("Failed to open file: %v", lPath)
@@ -106,12 +100,12 @@ func (cl *Client) PutFileGZ(lPath, rPath string) error {
 	}
 	defer f.Close()
 
-	return cl.Put(gzipReader(f), rPath)
+	return cl.PutGZ(f, bucket, rPath)
 }
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) PutDirTarGZ(lPath, rPath string) error {
+func (cl *Client) PutDirTarGZ(lPath, bucket, rPath string) error {
 	r, w := io.Pipe()
 	go func() {
 		defer w.Close()
@@ -154,7 +148,7 @@ func (cl *Client) PutDirTarGZ(lPath, rPath string) error {
 			}
 
 			// Write the data.
-			if _, err = io.Copy(w, fSrc); err != nil {
+			if _, err = io.Copy(tw, fSrc); err != nil {
 				log.Printf("Failed to write file to tar archive: %v", err)
 				w.CloseWithError(err)
 				return
@@ -165,16 +159,16 @@ func (cl *Client) PutDirTarGZ(lPath, rPath string) error {
 		}
 
 	}()
-	return cl.PutGZ(r, rPath)
+	return cl.PutGZ(r, bucket, rPath)
 }
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) Get(rPath string) (io.ReadCloser, error) {
-	obj, err := cl.cl.GetObject(cl.Bucket, rPath, minio.GetObjectOptions{})
+func (cl *Client) Get(bucket, rPath string) (io.ReadCloser, error) {
+	obj, err := cl.cl.GetObject(bucket, rPath, minio.GetObjectOptions{})
 	if err != nil {
 		log.Printf("Failed to get object: %v", err)
-		return nil, err
+		return nil, convertError(err)
 	}
 
 	r, err := decryptReader(cl.EncKey, obj)
@@ -194,8 +188,8 @@ func (cl *Client) Get(rPath string) (io.ReadCloser, error) {
 // ----------------------------------------------------------------------------
 
 // GetGZ: like Get, but decompresses the data stream.
-func (cl *Client) GetGZ(rPath string) (io.ReadCloser, error) {
-	r, err := cl.Get(rPath)
+func (cl *Client) GetGZ(bucket, rPath string) (io.ReadCloser, error) {
+	r, err := cl.Get(bucket, rPath)
 	if err != nil {
 		return nil, err
 	}
@@ -215,8 +209,8 @@ func (cl *Client) GetGZ(rPath string) (io.ReadCloser, error) {
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) GetFile(rPath, lPath string) error {
-	r, err := cl.Get(rPath)
+func (cl *Client) GetFile(bucket, rPath, lPath string) error {
+	r, err := cl.Get(bucket, rPath)
 	if err != nil {
 		return err
 	}
@@ -238,19 +232,12 @@ func (cl *Client) GetFile(rPath, lPath string) error {
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) GetFileGZ(rPath, lPath string) error {
-	r, err := cl.Get(rPath)
+func (cl *Client) GetFileGZ(bucket, rPath, lPath string) error {
+	r, err := cl.GetGZ(bucket, rPath)
 	if err != nil {
 		return err
 	}
 	defer r.Close()
-
-	gr, err := gzip.NewReader(r)
-	if err != nil {
-		log.Printf("Failed to create gzip reader: %v", err)
-		return err
-	}
-	defer gr.Close()
 
 	f, err := os.Create(lPath)
 	if err != nil {
@@ -259,7 +246,7 @@ func (cl *Client) GetFileGZ(rPath, lPath string) error {
 	}
 	defer f.Close()
 
-	if _, err := io.Copy(f, gr); err != nil {
+	if _, err := io.Copy(f, r); err != nil {
 		log.Printf("Failed to copy object to file: %v", err)
 		return err
 	}
@@ -268,8 +255,8 @@ func (cl *Client) GetFileGZ(rPath, lPath string) error {
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) GetDirTarGZ(rPath, lPath string) error {
-	f, err := cl.GetGZ(rPath)
+func (cl *Client) GetDirTarGZ(bucket, rPath, lPath string) error {
+	f, err := cl.GetGZ(bucket, rPath)
 	if err != nil {
 		log.Printf("Failed to get object %s: %v", rPath, err)
 		return err
@@ -322,7 +309,7 @@ func (cl *Client) GetDirTarGZ(rPath, lPath string) error {
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) Delete(rPaths ...string) error {
+func (cl *Client) Delete(bucket string, rPaths ...string) error {
 	rPathCh := make(chan string, len(rPaths))
 	for _, s := range rPaths {
 		rPathCh <- s
@@ -330,11 +317,11 @@ func (cl *Client) Delete(rPaths ...string) error {
 	close(rPathCh)
 
 	var err error
-	for rErr := range cl.cl.RemoveObjects(cl.Bucket, rPathCh) {
+	for rErr := range cl.cl.RemoveObjects(bucket, rPathCh) {
 		if rErr.Err != nil {
 			log.Printf("Failed to delete object %s: %v", rErr.ObjectName, rErr.Err)
 			if err == nil {
-				err = rErr.Err
+				err = convertError(rErr.Err)
 			}
 		}
 	}
@@ -349,7 +336,14 @@ type FileInfo struct {
 	Size    int64     // Size in storage.
 }
 
-func (cl *Client) List(prefix string, recursive bool) ([]FileInfo, error) {
+func (cl *Client) List(
+	bucket,
+	prefix string,
+	recursive bool,
+) (
+	[]FileInfo,
+	error,
+) {
 
 	// Create a done channel to control 'ListObjectsV2' go routine.
 	doneCh := make(chan struct{})
@@ -358,11 +352,11 @@ func (cl *Client) List(prefix string, recursive bool) ([]FileInfo, error) {
 	defer close(doneCh)
 
 	l := []FileInfo{}
-	objectCh := cl.cl.ListObjectsV2(cl.Bucket, prefix, recursive, doneCh)
+	objectCh := cl.cl.ListObjectsV2(bucket, prefix, recursive, doneCh)
 	for obj := range objectCh {
 		if obj.Err != nil {
 			log.Printf("Error listing objects: %v", obj.Err)
-			return nil, obj.Err
+			return nil, convertError(obj.Err)
 		}
 		l = append(l, FileInfo{
 			Name:    obj.Key,
@@ -376,29 +370,39 @@ func (cl *Client) List(prefix string, recursive bool) ([]FileInfo, error) {
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) Stat(rPath string) (FileInfo, error) {
-	// TODO
+func (cl *Client) Stat(bucket, rPath string) (FileInfo, error) {
+	info, err := cl.cl.StatObject(bucket, rPath, minio.StatObjectOptions{})
+	if err != nil {
+		log.Printf("Failed to stat object: %v", err)
+		return FileInfo{}, convertError(err)
+	}
+	return FileInfo{
+		Name:    info.Key,
+		ModTime: info.LastModified.UTC(),
+		Size:    info.Size,
+	}, nil
 }
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) Copy(srcPath, dstPath string) error {
+func (cl *Client) Copy(bucket, srcPath, dstPath string) error {
 	// Source object.
-	src := minio.NewSourceInfo(cl.Bucket, srcPath, nil)
+	src := minio.NewSourceInfo(bucket, srcPath, nil)
 
 	// Destination object.
-	dst, err := minio.NewDestinationInfo(cl.Bucket, dstPath, nil, nil)
+	dst, err := minio.NewDestinationInfo(bucket, dstPath, nil, nil)
 	if err != nil {
 		log.Printf("Failed to create destination: %v", err)
-		return err
+		return convertError(err)
 	}
 
 	// Copy object call.
 	if err = cl.cl.CopyObject(dst, src); err != nil {
 		log.Printf("Failed to copy %s -> %s: %v", srcPath, dstPath, err)
-		return err
+		return convertError(err)
 	}
 
 	return nil
-
 }
+
+// ----------------------------------------------------------------------------

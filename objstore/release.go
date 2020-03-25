@@ -4,6 +4,10 @@ var Release = ReleasePaths{}
 
 type ReleasePaths struct{}
 
+func (p ReleasePaths) Bucket() string {
+	return "release"
+}
+
 func (p ReleasePaths) CPGEUPrefix(version string) string {
 	return Join("cpg-eu", version)
 }

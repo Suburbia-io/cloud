@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type CPGEUStage0Version struct {
+type CPGEUStage0Info struct {
 	Vendor   string
 	Version  string
 	Archived bool
@@ -44,21 +44,21 @@ func (c CPGEUStage0Client) ListVendors() ([]string, error) {
 
 // ----------------------------------------------------------------------------
 
-func (c CPGEUStage0Client) ListVersions(vendor string) ([]CPGEUStage0Version, error) {
+func (c CPGEUStage0Client) ListVersions(vendor string) ([]CPGEUStage0Info, error) {
 	rPath := Join("stage0", vendor) + "/"
 
 	infos, err := c.cl.List(c.bucket, rPath, false)
 	if err != nil {
 		return nil, err
 	}
-	l := make([]CPGEUStage0Version, len(infos))
+	l := make([]CPGEUStage0Info, len(infos))
 	for i, info := range infos {
 		name := Base(info.Name)
 		if len(name) < 13 {
 			log.Printf("Invalid name in version list: %s", info.Name)
 			continue
 		}
-		l[i] = CPGEUStage0Version{
+		l[i] = CPGEUStage0Info{
 			Vendor:   vendor,
 			Version:  name[:13],
 			Archived: strings.HasSuffix(name, ".archived"),
@@ -119,7 +119,11 @@ func (c CPGEUStage0Client) Unarchive(vendor, version string) error {
 
 // ----------------------------------------------------------------------------
 
-// func (c CPGEUStage0Client)
+// Must be archived first.
+func (c CPGEUStage0Client) Delete(vendor, version string) error {
+	rPath := Join("stage0", vendor, version+".tar.gz.archived")
+	return c.cl.Delete(c.bucket, rPath)
+}
 
 // ----------------------------------------------------------------------------
 

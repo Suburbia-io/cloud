@@ -7,6 +7,14 @@ func Join(parts ...string) string {
 }
 
 func Base(path string) string {
+	if len(path) == 0 {
+		return ""
+	}
+
+	if path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+
 	idx := strings.LastIndex(path, "/")
 	if idx == -1 {
 		return path
@@ -15,6 +23,12 @@ func Base(path string) string {
 }
 
 func Dir(path string) string {
+	if len(path) == 0 {
+		return ""
+	}
+	if path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
 	idx := strings.LastIndex(path, "/")
 	if idx == -1 {
 		return ""

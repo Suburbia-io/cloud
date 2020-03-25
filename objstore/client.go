@@ -344,7 +344,6 @@ func (cl *Client) List(
 	[]FileInfo,
 	error,
 ) {
-
 	// Create a done channel to control 'ListObjectsV2' go routine.
 	doneCh := make(chan struct{})
 

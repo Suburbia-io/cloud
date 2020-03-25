@@ -49,6 +49,9 @@ func TestDir(t *testing.T) {
 		}, {
 			In:  "abcd/abc",
 			Out: "abcd",
+		}, {
+			In:  "abcd/abc/",
+			Out: "abcd",
 		},
 	}
 

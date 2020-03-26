@@ -2,12 +2,12 @@ package objstore
 
 import (
 	"log"
+	"sort"
 	"strings"
 )
 
-type CPGEUStage0Info struct {
-	Vendor   string
-	Version  string
+type CPGEUStage0Version struct {
+	Name     string // A valid version name: YYYY-MM-DD.NN
 	Archived bool
 }
 
@@ -39,31 +39,35 @@ func (c CPGEUStage0Client) ListVendors() ([]string, error) {
 	for i, info := range infos {
 		l[i] = Base(info.Name)
 	}
+	sort.Strings(l)
 	return l, nil
 }
 
 // ----------------------------------------------------------------------------
 
-func (c CPGEUStage0Client) ListVersions(vendor string) ([]CPGEUStage0Info, error) {
+func (c CPGEUStage0Client) ListVersions(vendor string) ([]CPGEUStage0Version, error) {
 	rPath := Join("stage0", vendor) + "/"
 
 	infos, err := c.cl.List(c.bucket, rPath, false)
 	if err != nil {
 		return nil, err
 	}
-	l := make([]CPGEUStage0Info, len(infos))
+	l := make([]CPGEUStage0Version, len(infos))
 	for i, info := range infos {
 		name := Base(info.Name)
 		if len(name) < 13 {
 			log.Printf("Invalid name in version list: %s", info.Name)
 			continue
 		}
-		l[i] = CPGEUStage0Info{
-			Vendor:   vendor,
-			Version:  name[:13],
+		l[i] = CPGEUStage0Version{
+			Name:     name[:13],
 			Archived: strings.HasSuffix(name, ".archived"),
 		}
 	}
+	sort.Slice(l, func(i, j int) bool {
+		return l[i].Name < l[j].Name
+	})
+
 	return l, nil
 }
 
@@ -74,7 +78,7 @@ func (c CPGEUStage0Client) Upload(
 	vendor string,
 	version string,
 ) error {
-	if err := c.validateVendor(vendor); err != nil {
+	if err := validateCPGEUVendor(vendor); err != nil {
 		return ErrInvalidVendor
 	}
 	if err := validateVersion(version); err != nil {
@@ -123,15 +127,4 @@ func (c CPGEUStage0Client) Unarchive(vendor, version string) error {
 func (c CPGEUStage0Client) Delete(vendor, version string) error {
 	rPath := Join("stage0", vendor, version+".tar.gz.archived")
 	return c.cl.Delete(c.bucket, rPath)
-}
-
-// ----------------------------------------------------------------------------
-
-func (CPGEUStage0Client) validateVendor(vendor string) error {
-	switch vendor {
-	case "chicken", "dingo", "goat", "toad":
-		return nil
-	default:
-		return ErrInvalidVendor
-	}
 }

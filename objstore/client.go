@@ -173,7 +173,7 @@ func (cl *Client) Get(bucket, rPath string) (io.ReadCloser, error) {
 
 	r, err := decryptReader(cl.EncKey, obj)
 	if err != nil {
-		return nil, err
+		return nil, convertError(err)
 	}
 
 	return struct {
@@ -258,7 +258,6 @@ func (cl *Client) GetFileGZ(bucket, rPath, lPath string) error {
 func (cl *Client) GetDirTarGZ(bucket, rPath, lPath string) error {
 	f, err := cl.GetGZ(bucket, rPath)
 	if err != nil {
-		log.Printf("Failed to get object %s: %v", rPath, err)
 		return err
 	}
 	defer f.Close()

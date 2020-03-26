@@ -105,19 +105,13 @@ func TestCPGEUStage0ListVersions(t *testing.T) {
 		t.Fatal(l)
 	}
 
-	for i := range l {
-		if l[i].Vendor != "goat" {
-			t.Fatal(l[i])
-		}
-	}
-
-	if l[0].Version != "2019-01-01.00" || l[0].Archived {
+	if l[0].Name != "2019-01-01.00" || l[0].Archived {
 		t.Fatal(l[0])
 	}
-	if l[1].Version != "2019-01-02.00" || !l[1].Archived {
+	if l[1].Name != "2019-01-02.00" || !l[1].Archived {
 		t.Fatal(l[1])
 	}
-	if l[2].Version != "2019-01-02.01" || l[2].Archived {
+	if l[2].Name != "2019-01-02.01" || l[2].Archived {
 		t.Fatal(l[2])
 	}
 }
@@ -129,6 +123,26 @@ func TestCPGEUStage0UploadErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := cl.Upload("files/d", "goat", "201-01-01.00"); err != ErrInvalidVersion {
+		t.Fatal(err)
+	}
+}
+
+func TestCPGEUStage0Delete(t *testing.T) {
+	cl := NewCPGEUStage0Client(NewClientForTesting(), testBucket)
+
+	if err := cl.Upload("files/d", "goat", "2019-01-01.00"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cl.Archive("goat", "2019-01-01.00"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cl.Delete("goat", "2019-01-01.00"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cl.Download("goat", "2019-01-01.00", "files/out/2019-01-01.00"); err != ErrPathNotFound {
 		t.Fatal(err)
 	}
 }

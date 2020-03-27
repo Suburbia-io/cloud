@@ -78,7 +78,6 @@ func (vms *vmSupervisor) putVM(vm egoscale.VirtualMachine) {
 func (vms *vmSupervisor) delVM(id string) {
 	vms.lock.Lock()
 	defer vms.lock.Unlock()
-	vms.log("Deleting vm %s...", id)
 	delete(vms.vms, id)
 }
 

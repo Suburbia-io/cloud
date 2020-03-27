@@ -160,6 +160,8 @@ func (vms *vmSupervisor) scaleUp() stateFunc {
 	return vms.scaleUp
 }
 
+// ----------------------------------------------------------------------------
+
 func (vms *vmSupervisor) DeleteVM(id string) error {
 	vms.log("Deleting vm %s...", id)
 

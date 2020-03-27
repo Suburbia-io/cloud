@@ -96,6 +96,7 @@ func (vm *vm) runTask() stateFunc {
 	}()
 
 	if vm.executable != task.Executable {
+		vm.executable = ""
 
 		vm.log("Cleaning up remote dir...")
 

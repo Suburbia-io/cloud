@@ -127,7 +127,7 @@ func (vm *vm) runTask() stateFunc {
 		b.WriteString("\n")
 	}
 
-	b.WriteString(task.Executable)
+	b.WriteString(rExecPath)
 	b.WriteString(" ")
 	b.WriteString(task.Args)
 

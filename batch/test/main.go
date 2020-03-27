@@ -19,6 +19,7 @@ func MyFunc(args *MyArgs) error {
 func main() {
 	batch.Register(MyFunc)
 	batch.Init()
+
 	cl, err := batch.NewClient("../cmd/batchd/socket")
 	if err != nil {
 		panic(err)
@@ -29,6 +30,16 @@ func main() {
 	resp, err := cl.RunFunc(env, MyFunc, MyArgs{
 		X: 10,
 		Y: 15,
+	})
+	if err != nil {
+		panic(err)
+	}
+	log.Printf("Code: %d", resp.Code)
+	log.Printf("Output: %s", resp.Output)
+
+	resp, err = cl.RunFunc(env, MyFunc, MyArgs{
+		X: 5,
+		Y: 9,
 	})
 	if err != nil {
 		panic(err)

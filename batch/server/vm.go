@@ -115,6 +115,8 @@ func (vm *vm) runTask() stateFunc {
 			vm.log(msg)
 			return vm.stop
 		}
+
+		vm.executable = task.Executable
 	}
 
 	// Build run script.

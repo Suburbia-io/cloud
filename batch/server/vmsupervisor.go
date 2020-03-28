@@ -19,6 +19,8 @@ const (
 )
 
 const vmInitScript = `#!/bin/bash
+echo "* soft nofile 1000000" >> /etc/security/limits.conf
+echo "* hard nofile 1000000" >> /etc/security/limits.conf
 adduser -disabled-password --gecos "" batch
 cp -r /root/.ssh /home/batch/
 chown -R batch:batch /home/batch/.ssh

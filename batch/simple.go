@@ -76,3 +76,11 @@ func Init() {
 	// Success.
 	os.Exit(0)
 }
+
+func CopyEnv(vars ...string) map[string]string {
+	m := make(map[string]string, len(vars))
+	for _, s := range vars {
+		m[s] = os.Getenv(s)
+	}
+	return m
+}

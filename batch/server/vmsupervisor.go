@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	maxVMs            = 200
-	esDiskSize        = 50                                     // In GB
-	esZone            = "35eb7739-d19e-45f7-a581-4687c54d6d02" // de-fra-1
-	esServiceOffering = "b6e9d1e8-89fc-4db3-aaa4-9b4c5b1d0844" // 2 core/4GB
+	maxVMs     = 200
+	esDiskSize = 50                                     // In GB
+	esZone     = "35eb7739-d19e-45f7-a581-4687c54d6d02" // de-fra-1
+	//esServiceOffering = "b6e9d1e8-89fc-4db3-aaa4-9b4c5b1d0844" // 2 core/4GB
+	esServiceOffering = "c6f99499-7f59-4138-9427-a09db13af2bc" // 4 core/8GB
 	esTemplate        = "b7ce66da-8bd1-4a02-8788-0bd880038b01" // Debian 10
 	esKeyPair         = "data@popcoin"
 )

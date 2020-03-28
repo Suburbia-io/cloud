@@ -130,6 +130,10 @@ func (vm *vm) runTask() stateFunc {
 		b.WriteString("\n")
 	}
 
+	b.WriteString("cd ")
+	b.WriteString(rTaskDir)
+	b.WriteString("\n")
+
 	b.WriteString(rExecPath)
 	b.WriteString(" ")
 	b.WriteString(task.Args)

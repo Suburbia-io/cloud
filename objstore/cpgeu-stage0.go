@@ -52,17 +52,17 @@ func (c CPGEUStage0Client) ListVersions(vendor string) ([]CPGEUStage0Version, er
 	if err != nil {
 		return nil, err
 	}
-	l := make([]CPGEUStage0Version, len(infos))
-	for i, info := range infos {
+	l := make([]CPGEUStage0Version, 0, len(infos))
+	for _, info := range infos {
 		name := Base(info.Name)
 		if len(name) < 13 {
 			log.Printf("Invalid name in version list: %s", info.Name)
 			continue
 		}
-		l[i] = CPGEUStage0Version{
+		l = append(l, CPGEUStage0Version{
 			Name:     name[:13],
 			Archived: strings.HasSuffix(name, ".archived"),
-		}
+		})
 	}
 	sort.Slice(l, func(i, j int) bool {
 		return l[i].Name < l[j].Name

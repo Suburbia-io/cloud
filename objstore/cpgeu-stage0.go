@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-type CPGEUStage0Version struct {
+type CPGEUStage0Item struct {
 	Name     string // A valid version name: YYYY-MM-DD.NN
 	Archived bool
 }
@@ -45,21 +45,21 @@ func (c CPGEUStage0Client) ListVendors() ([]string, error) {
 
 // ----------------------------------------------------------------------------
 
-func (c CPGEUStage0Client) ListVersions(vendor string) ([]CPGEUStage0Version, error) {
+func (c CPGEUStage0Client) ListVersions(vendor string) ([]CPGEUStage0Item, error) {
 	rPath := Join("stage0", vendor) + "/"
 
 	infos, err := c.cl.List(c.bucket, rPath, false)
 	if err != nil {
 		return nil, err
 	}
-	l := make([]CPGEUStage0Version, 0, len(infos))
+	l := make([]CPGEUStage0Item, 0, len(infos))
 	for _, info := range infos {
 		name := Base(info.Name)
 		if len(name) < 13 {
 			log.Printf("Invalid name in version list: %s", info.Name)
 			continue
 		}
-		l = append(l, CPGEUStage0Version{
+		l = append(l, CPGEUStage0Item{
 			Name:     name[:13],
 			Archived: strings.HasSuffix(name, ".archived"),
 		})

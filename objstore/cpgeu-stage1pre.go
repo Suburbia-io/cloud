@@ -208,14 +208,14 @@ func (c CPGEUStage1PreClient) ListDays(vendor, version string) ([]string, error)
 
 // ----------------------------------------------------------------------------
 
-type CPGEUStage1PreDay struct {
+type CPGEUStage1PreItem struct {
 	Vendor  string
 	Version string
 	Day     string
 	ModTime time.Time
 }
 
-func (c CPGEUStage1PreClient) ListAll() (l []CPGEUStage1PreDay, err error) {
+func (c CPGEUStage1PreClient) ListAll() (l []CPGEUStage1PreItem, err error) {
 	m, err := c.getShadowAll()
 	if err != nil {
 		return nil, err
@@ -227,7 +227,7 @@ func (c CPGEUStage1PreClient) ListAll() (l []CPGEUStage1PreDay, err error) {
 		return nil, err
 	}
 
-	l = make([]CPGEUStage1PreDay, 0, len(infos))
+	l = make([]CPGEUStage1PreItem, 0, len(infos))
 	for _, info := range infos {
 		parts := strings.Split(info.Name, "/")
 		if len(parts) != 5 || len(parts[4]) != 17 {
@@ -242,7 +242,7 @@ func (c CPGEUStage1PreClient) ListAll() (l []CPGEUStage1PreDay, err error) {
 			continue
 		}
 
-		l = append(l, CPGEUStage1PreDay{
+		l = append(l, CPGEUStage1PreItem{
 			Vendor:  vendor,
 			Version: version,
 			Day:     day,

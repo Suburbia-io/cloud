@@ -105,13 +105,13 @@ func TestCPGEUStage0ListVersions(t *testing.T) {
 		t.Fatal(l)
 	}
 
-	if l[0].Name != "2019-01-01.00" || l[0].Archived {
+	if l[0].Version != "2019-01-01.00" || l[0].Archived {
 		t.Fatal(l[0])
 	}
-	if l[1].Name != "2019-01-02.00" || !l[1].Archived {
+	if l[1].Version != "2019-01-02.00" || !l[1].Archived {
 		t.Fatal(l[1])
 	}
-	if l[2].Name != "2019-01-02.01" || l[2].Archived {
+	if l[2].Version != "2019-01-02.01" || l[2].Archived {
 		t.Fatal(l[2])
 	}
 }

@@ -7,7 +7,7 @@ import (
 )
 
 type CPGEUStage0Item struct {
-	Name     string // A valid version name: YYYY-MM-DD.NN
+	Version  string // A valid version name: YYYY-MM-DD.NN
 	Archived bool
 }
 
@@ -60,12 +60,12 @@ func (c CPGEUStage0Client) ListVersions(vendor string) ([]CPGEUStage0Item, error
 			continue
 		}
 		l = append(l, CPGEUStage0Item{
-			Name:     name[:13],
+			Version:  name[:13],
 			Archived: strings.HasSuffix(name, ".archived"),
 		})
 	}
 	sort.Slice(l, func(i, j int) bool {
-		return l[i].Name < l[j].Name
+		return l[i].Version < l[j].Version
 	})
 
 	return l, nil

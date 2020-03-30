@@ -50,6 +50,7 @@ func pathsMatch(lhs, rhs string) bool {
 	lInfo, err := os.Stat(lhs)
 	must(err)
 	rInfo, err := os.Stat(rhs)
+	must(err)
 
 	// Both either files or directories.
 	if lInfo.IsDir() != rInfo.IsDir() {

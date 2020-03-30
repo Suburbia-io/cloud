@@ -1,7 +1,5 @@
 package objstore
 
-// TODO: Exists?
-
 import (
 	"archive/tar"
 	"compress/gzip"
@@ -356,6 +354,29 @@ func (cl *Client) List(
 		})
 	}
 
+	return l, nil
+}
+
+func (cl *Client) ListNames(bucket, prefix string) ([]string, error) {
+	l, err := cl.List(bucket, prefix, false)
+	if err != nil {
+		return nil, err
+	}
+	ls := make([]string, len(l))
+	for i := range ls {
+		ls[i] = l[i].Name
+	}
+	return ls, nil
+}
+
+func (cl *Client) ListBaseNames(bucket, prefix string) ([]string, error) {
+	l, err := cl.ListNames(bucket, prefix)
+	if err != nil {
+		return nil, err
+	}
+	for i := range l {
+		l[i] = Base(l[i])
+	}
 	return l, nil
 }
 

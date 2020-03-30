@@ -137,28 +137,50 @@ func (vms *vmSupervisor) scaleUp() stateFunc {
 	queueLen := vms.queue.Length()
 	numVMs := vms.getVMCount()
 
-	if numVMs >= maxVMs || queueLen <= 2*numVMs {
+	// How many to spawn?
+	N := queueLen - 2*numVMs
+	if numVMs+N > maxVMs {
+		N = maxVMs - numVMs
+	}
+	if N > 8 {
+		N = 8
+	}
+
+	if N <= 0 {
 		return vms.sleep
 	}
 
-	vms.log("Scaling up...")
+	vms.log("Launching %d VMs...", N)
 
-	req := &egoscale.DeployVirtualMachine{
-		Size:              esDiskSize,
-		ServiceOfferingID: egoscale.MustParseUUID(esServiceOffering),
-		TemplateID:        egoscale.MustParseUUID(esTemplate),
-		ZoneID:            egoscale.MustParseUUID(esZone),
-		KeyPair:           esKeyPair,
-		UserData:          base64.StdEncoding.EncodeToString([]byte(vmInitScript)),
+	errChan := make(chan error, N)
+
+	for i := 0; i < N; i++ {
+		go func() {
+			req := &egoscale.DeployVirtualMachine{
+				Size:              esDiskSize,
+				ServiceOfferingID: egoscale.MustParseUUID(esServiceOffering),
+				TemplateID:        egoscale.MustParseUUID(esTemplate),
+				ZoneID:            egoscale.MustParseUUID(esZone),
+				KeyPair:           esKeyPair,
+				UserData:          base64.StdEncoding.EncodeToString([]byte(vmInitScript)),
+			}
+
+			resp, err := vms.cl.Request(req)
+			if err != nil {
+				vms.log("Failed to deploy vm: %v", err)
+				errChan <- err
+			}
+
+			vms.putVM(*resp.(*egoscale.VirtualMachine))
+			errChan <- nil
+		}()
 	}
 
-	resp, err := vms.cl.Request(req)
-	if err != nil {
-		vms.log("Failed to deploy vm: %v", err)
-		return vms.sleepError
+	for i := 0; i < N; i++ {
+		if err := <-errChan; err != nil {
+			return vms.sleepError
+		}
 	}
-
-	vms.putVM(*resp.(*egoscale.VirtualMachine))
 
 	return vms.scaleUp
 }

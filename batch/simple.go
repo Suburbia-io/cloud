@@ -17,7 +17,7 @@ var (
 
 // Register stores information about functions so they can be called
 // remotely. The function must take a pointer to a struct as an argument and
-// return a single error.
+// return nothing.
 func Register(fns ...interface{}) {
 	for _, fn := range fns {
 		fnType := reflect.TypeOf(fn)

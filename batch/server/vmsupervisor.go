@@ -138,16 +138,28 @@ func (vms *vmSupervisor) scaleUp() stateFunc {
 	numVMs := vms.getVMCount()
 
 	// How many to spawn?
-	N := queueLen - 2*numVMs
+	N := 0
+	switch queueLen {
+	case 0:
+		// Do nothing.
+	case 1:
+		if numVMs == 0 {
+			N = 1
+		}
+	default:
+		N = queueLen/2 - numVMs + 1
+	}
+
 	if numVMs+N > maxVMs {
 		N = maxVMs - numVMs
-	}
-	if N > 8 {
-		N = 8
 	}
 
 	if N <= 0 {
 		return vms.sleep
+	}
+
+	if N > 8 {
+		N = 8
 	}
 
 	vms.log("Launching %d VMs...", N)

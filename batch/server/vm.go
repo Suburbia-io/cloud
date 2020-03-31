@@ -137,6 +137,7 @@ func (vm *vm) runTask() stateFunc {
 	b.WriteString(rExecPath)
 	b.WriteString(" ")
 	b.WriteString(task.Args)
+	b.WriteString(" |& tee output.txt")
 
 	vm.log("Executing remote task...")
 

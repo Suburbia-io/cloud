@@ -12,7 +12,12 @@ var (
 )
 
 func NewClientForTesting() *Client {
-	cl := &Client{}
+	cl := &Client{
+		Host:   os.Getenv("SB_OBJSTORE_HOST"),
+		Key:    os.Getenv("SB_OBJSTORE_KEY"),
+		Secret: os.Getenv("SB_OBJSTORE_SECRET"),
+		EncKey: []byte(os.Getenv("SB_OBJSTORE_ENC_KEY")),
+	}
 	if err := cl.Connect(); err != nil {
 		panic(err)
 	}

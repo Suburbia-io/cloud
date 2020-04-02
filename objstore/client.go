@@ -7,15 +7,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	minio "github.com/minio/minio-go"
-)
-
-var (
-	defaultHost   = os.Getenv("SB_OBJSTORE_HOST")
-	defaultKey    = os.Getenv("SB_OBJSTORE_KEY")
-	defaultSecret = os.Getenv("SB_OBJSTORE_SECRET")
-	defaultEncKey = []byte(os.Getenv("SB_OBJSTORE_ENC_KEY"))
 )
 
 type Client struct {
@@ -33,24 +27,24 @@ func (cl *Client) Connect() (err error) {
 	if cl.cl != nil {
 		cl.cl = nil
 	}
-	if cl.Host == "" {
-		cl.Host = defaultHost
-	}
-	if cl.Key == "" {
-		cl.Key = defaultKey
-	}
-	if cl.Secret == "" {
-		cl.Secret = defaultSecret
-	}
-	if len(cl.EncKey) == 0 {
-		cl.EncKey = defaultEncKey
-	}
 
 	cl.cl, err = minio.New(cl.Host, cl.Key, cl.Secret, true)
 	if err != nil {
 		log.Printf("Failed to connect to object store: %v", err)
 	}
+
 	return err
+}
+
+func (cl *Client) withRetry(fn func() error) (err error) {
+	for i := 0; i < 4; i++ {
+		if err = fn(); err != nil {
+			time.Sleep(8 * time.Second)
+			continue
+		}
+		break
+	}
+	return
 }
 
 // ----------------------------------------------------------------------------
@@ -61,7 +55,9 @@ func (cl *Client) Put(r io.Reader, bucket, rPath string) error {
 		return err
 	}
 
-	_, err = cl.cl.PutObject(bucket, rPath, enc, -1, minio.PutObjectOptions{})
+	_, err = cl.cl.PutObject(bucket, rPath, enc, -1, minio.PutObjectOptions{
+		PartSize: 1024 * 1024 * 64,
+	})
 	if err != nil {
 		log.Printf("Failed to put object %s/%s: %v", bucket, rPath, err)
 	}
@@ -77,7 +73,13 @@ func (cl *Client) PutGZ(r io.Reader, bucket, rPath string) error {
 
 // ----------------------------------------------------------------------------
 
-func (cl *Client) PutFile(lPath, bucket, rPath string) error {
+func (cl *Client) PutFile(lPath, bucket, rPath string) (err error) {
+	return cl.withRetry(func() error {
+		return cl.putFile(lPath, bucket, rPath)
+	})
+}
+
+func (cl *Client) putFile(lPath, bucket, rPath string) error {
 	f, err := os.Open(lPath)
 	if err != nil {
 		log.Printf("Failed to open file: %v", lPath)
@@ -90,6 +92,12 @@ func (cl *Client) PutFile(lPath, bucket, rPath string) error {
 // ----------------------------------------------------------------------------
 
 func (cl *Client) PutFileGZ(lPath, bucket, rPath string) error {
+	return cl.withRetry(func() error {
+		return cl.putFileGZ(lPath, bucket, rPath)
+	})
+}
+
+func (cl *Client) putFileGZ(lPath, bucket, rPath string) error {
 	f, err := os.Open(lPath)
 	if err != nil {
 		log.Printf("Failed to open file: %v", lPath)
@@ -103,6 +111,12 @@ func (cl *Client) PutFileGZ(lPath, bucket, rPath string) error {
 // ----------------------------------------------------------------------------
 
 func (cl *Client) PutDirTarGZ(lPath, bucket, rPath string) error {
+	return cl.withRetry(func() error {
+		return cl.putDirTarGZ(lPath, bucket, rPath)
+	})
+}
+
+func (cl *Client) putDirTarGZ(lPath, bucket, rPath string) error {
 	r, w := io.Pipe()
 	go func() {
 		defer w.Close()

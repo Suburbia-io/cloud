@@ -72,7 +72,7 @@ func (vm *vm) start() stateFunc {
 // getNextTask -> (runTask, stop)
 func (vm *vm) getNextTask() stateFunc {
 	vm.log("Waiting for next task...")
-	task, ok := vm.queue.Next(2 * time.Minute)
+	task, ok := vm.queue.Next(16 * time.Second)
 	if !ok {
 		return vm.stop
 	}
@@ -130,6 +130,7 @@ func (vm *vm) runTask() stateFunc {
 		b.WriteString("\n")
 	}
 
+	b.WriteString("set -o pipefail\n")
 	b.WriteString("cd ")
 	b.WriteString(rTaskDir)
 	b.WriteString("\n")

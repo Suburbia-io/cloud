@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 type Client struct {
@@ -62,4 +63,42 @@ func (cl *Client) RunFunc(
 		Env:        env,
 		Args:       b.String(),
 	})
+}
+
+// Run runs the function on the given list of arguments. See RunFunc.
+func (cl *Client) MapFunc(
+	env map[string]string,
+	fn interface{},
+	argsList ...interface{},
+) []Result {
+	results := make([]Result, len(argsList))
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(argsList))
+
+	fmt.Fprint(os.Stderr, "\n")
+	for i, args := range argsList {
+		go func(i int, args interface{}) {
+			result, err := cl.RunFunc(env, fn, args)
+			if err != nil {
+				result = Result{
+					Code:   -1,
+					Output: fmt.Sprintf("Failed to run function: %v", err),
+				}
+			}
+			results[i] = result
+
+			if result.Code == 0 {
+				fmt.Fprint(os.Stderr, ".")
+			} else {
+				fmt.Fprint(os.Stderr, "X")
+			}
+
+			wg.Done()
+		}(i, args)
+	}
+	wg.Wait()
+	fmt.Fprint(os.Stderr, "\n")
+
+	return results
 }

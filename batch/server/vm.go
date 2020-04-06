@@ -125,9 +125,9 @@ func (vm *vm) runTask() stateFunc {
 	for key, value := range task.Env {
 		b.WriteString("export ")
 		b.WriteString(key)
-		b.WriteString("=")
+		b.WriteString("='")
 		b.WriteString(value)
-		b.WriteString("\n")
+		b.WriteString("'\n")
 	}
 
 	b.WriteString("set -o pipefail\n")

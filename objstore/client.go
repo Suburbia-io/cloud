@@ -2,6 +2,7 @@ package objstore
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"io"
 	"log"
@@ -39,6 +40,7 @@ func (cl *Client) Connect() (err error) {
 func (cl *Client) withRetry(fn func() error) (err error) {
 	for i := 0; i < 4; i++ {
 		if err = fn(); err != nil {
+			log.Printf("Retrying...")
 			time.Sleep(8 * time.Second)
 			continue
 		}
@@ -62,6 +64,18 @@ func (cl *Client) Put(r io.Reader, bucket, rPath string) error {
 		log.Printf("Failed to put object %s/%s: %v", bucket, rPath, err)
 	}
 	return convertError(err)
+}
+
+// ----------------------------------------------------------------------------
+
+func (cl *Client) PutBytes(buf []byte, bucket, rPath string) error {
+	return cl.withRetry(func() error {
+		return cl.putBytes(buf, bucket, rPath)
+	})
+}
+
+func (cl *Client) putBytes(buf []byte, bucket, rPath string) error {
+	return cl.Put(bytes.NewBuffer(buf), bucket, rPath)
 }
 
 // ----------------------------------------------------------------------------

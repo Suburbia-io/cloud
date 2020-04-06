@@ -47,7 +47,10 @@ func runVMSupervisor(queue iQueue, apiKey, apiSecret, sshKeyPath string) {
 		vms:   map[string]struct{}{},
 		queue: queue,
 	}
-	go cl.run()
+	go cl.runCollectVMs()
+	for i := 0; i < 16; i++ {
+		go cl.runScaleUp()
+	}
 }
 
 // ----------------------------------------------------------------------------
@@ -86,32 +89,14 @@ func (vms *vmSupervisor) delVM(id string) {
 
 // ----------------------------------------------------------------------------
 
-func (vms *vmSupervisor) run() {
-	var next stateFunc = vms.collectVMs
-
-	for next != nil {
-		next = next()
+func (vms *vmSupervisor) runCollectVMs() {
+	for {
+		vms.runCollectVMsInner()
+		time.Sleep(2 * time.Minute)
 	}
 }
 
-// ----------------------------------------------------------------------------
-
-// sleep -> (collectVMs, scaleUp)
-func (vms *vmSupervisor) sleep() stateFunc {
-	time.Sleep(time.Second)
-	if time.Since(vms.collectedAt) > 2*time.Minute {
-		return vms.collectVMs
-	}
-	return vms.scaleUp
-}
-
-func (vms *vmSupervisor) sleepError() stateFunc {
-	time.Sleep(29 * time.Second)
-	return vms.sleep
-}
-
-// collectVMs -> (scaleUp, sleepError)
-func (vms *vmSupervisor) collectVMs() stateFunc {
+func (vms *vmSupervisor) runCollectVMsInner() {
 	vms.collectedAt = time.Now()
 
 	vms.log("Getting list of running vms...")
@@ -120,7 +105,7 @@ func (vms *vmSupervisor) collectVMs() stateFunc {
 	iResp, err := vms.cl.Request(req)
 	if err != nil {
 		vms.log("Failed to get list of running vms: %v", err)
-		return vms.sleepError
+		return
 	}
 
 	resp := iResp.(*egoscale.ListVirtualMachinesResponse)
@@ -128,12 +113,24 @@ func (vms *vmSupervisor) collectVMs() stateFunc {
 	for _, vm := range resp.VirtualMachine {
 		vms.putVM(vm)
 	}
-
-	return vms.scaleUp
 }
 
-// scaleUp -> (scaleUp, sleepError, sleep)
-func (vms *vmSupervisor) scaleUp() stateFunc {
+// ----------------------------------------------------------------------------
+
+func (vms *vmSupervisor) runScaleUp() {
+	for {
+		spawned, err := vms.runScaleUpInner()
+		if err != nil {
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		if !spawned {
+			time.Sleep(time.Second)
+		}
+	}
+}
+
+func (vms *vmSupervisor) runScaleUpInner() (bool, error) {
 	queueLen := vms.queue.Length()
 	numVMs := vms.getVMCount()
 
@@ -155,47 +152,28 @@ func (vms *vmSupervisor) scaleUp() stateFunc {
 	}
 
 	if N <= 0 {
-		return vms.sleep
+		return false, nil
 	}
 
-	if N > 16 {
-		N = 16
+	vms.log("Launching VMs...")
+
+	req := &egoscale.DeployVirtualMachine{
+		Size:              esDiskSize,
+		ServiceOfferingID: egoscale.MustParseUUID(esServiceOffering),
+		TemplateID:        egoscale.MustParseUUID(esTemplate),
+		ZoneID:            egoscale.MustParseUUID(esZone),
+		KeyPair:           esKeyPair,
+		UserData:          base64.StdEncoding.EncodeToString([]byte(vmInitScript)),
 	}
 
-	vms.log("Launching %d VMs...", N)
-
-	errChan := make(chan error, N)
-
-	for i := 0; i < N; i++ {
-		go func() {
-			req := &egoscale.DeployVirtualMachine{
-				Size:              esDiskSize,
-				ServiceOfferingID: egoscale.MustParseUUID(esServiceOffering),
-				TemplateID:        egoscale.MustParseUUID(esTemplate),
-				ZoneID:            egoscale.MustParseUUID(esZone),
-				KeyPair:           esKeyPair,
-				UserData:          base64.StdEncoding.EncodeToString([]byte(vmInitScript)),
-			}
-
-			resp, err := vms.cl.Request(req)
-			if err != nil {
-				vms.log("Failed to deploy vm: %v", err)
-				errChan <- err
-				return
-			}
-
-			vms.putVM(*resp.(*egoscale.VirtualMachine))
-			errChan <- nil
-		}()
+	resp, err := vms.cl.Request(req)
+	if err != nil {
+		vms.log("Failed to deploy vm: %v", err)
+		return false, err
 	}
 
-	for i := 0; i < N; i++ {
-		if err := <-errChan; err != nil {
-			return vms.sleepError
-		}
-	}
-
-	return vms.scaleUp
+	vms.putVM(*resp.(*egoscale.VirtualMachine))
+	return true, nil
 }
 
 // ----------------------------------------------------------------------------

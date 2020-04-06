@@ -158,8 +158,8 @@ func (vms *vmSupervisor) scaleUp() stateFunc {
 		return vms.sleep
 	}
 
-	if N > 8 {
-		N = 8
+	if N > 16 {
+		N = 16
 	}
 
 	vms.log("Launching %d VMs...", N)
@@ -181,6 +181,7 @@ func (vms *vmSupervisor) scaleUp() stateFunc {
 			if err != nil {
 				vms.log("Failed to deploy vm: %v", err)
 				errChan <- err
+				return
 			}
 
 			vms.putVM(*resp.(*egoscale.VirtualMachine))

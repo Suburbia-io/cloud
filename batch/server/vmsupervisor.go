@@ -70,7 +70,7 @@ func (vms *vmSupervisor) putVM(vm egoscale.VirtualMachine) {
 
 	_, ok := vms.vms[id]
 	if !ok {
-		vms.log("Adding vm %s...", id)
+		vms.log("Adding vm %s/%s...", id, vm.DefaultNic().IPAddress.String())
 		vms.vms[id] = struct{}{}
 		runVM(
 			vms,
@@ -138,7 +138,9 @@ func (vms *vmSupervisor) collectVMs() {
 	resp := iResp.(*egoscale.ListVirtualMachinesResponse)
 	vms.log("Found %d running vms.", len(resp.VirtualMachine))
 	for _, vm := range resp.VirtualMachine {
-		vms.putVM(vm)
+		if vm.DefaultNic() != nil && vm.DefaultNic().IPAddress != nil {
+			vms.putVM(vm)
+		}
 	}
 }
 
@@ -163,7 +165,7 @@ func (vms *vmSupervisor) attemptLaunch() (bool, error) {
 	}
 	defer vms.launchComplete()
 
-	vms.log("Launching VMs...")
+	vms.log("Launching VM...")
 
 	req := &egoscale.DeployVirtualMachine{
 		RootDiskSize:      esDiskSize,

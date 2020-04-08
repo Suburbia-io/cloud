@@ -28,9 +28,11 @@ touch /batch.ready
 `
 
 type vmSupervisor struct {
-	sshKeyPath  string
-	lock        sync.Mutex
-	vms         map[string]struct{} // Map of known VMs by ID.
+	sshKeyPath string
+	lock       sync.Mutex
+	vms        map[string]struct{} // Map of known VMs by ID (exoscale).
+	launching  int                 // Number of VMs currently launching.
+
 	collectedAt time.Time
 	queue       iQueue
 	cl          *egoscale.Client
@@ -46,9 +48,9 @@ func runVMSupervisor(queue iQueue, apiKey, apiSecret, sshKeyPath string) {
 		vms:   map[string]struct{}{},
 		queue: queue,
 	}
-	go cl.runCollectVMs()
+	go cl.runCollector()
 	for i := 0; i < 16; i++ {
-		go cl.runScaleUp()
+		go cl.runLauncher()
 	}
 }
 
@@ -60,12 +62,6 @@ func (vms *vmSupervisor) log(s string, args ...interface{}) {
 
 // ----------------------------------------------------------------------------
 
-func (vms *vmSupervisor) getVMCount() int {
-	vms.lock.Lock()
-	defer vms.lock.Unlock()
-	return len(vms.vms)
-}
-
 func (vms *vmSupervisor) putVM(vm egoscale.VirtualMachine) {
 	id := vm.ID.String()
 
@@ -76,7 +72,13 @@ func (vms *vmSupervisor) putVM(vm egoscale.VirtualMachine) {
 	if !ok {
 		vms.log("Adding vm %s...", id)
 		vms.vms[id] = struct{}{}
-		runVM(vm, vms, vms.queue, vms.sshKeyPath)
+		runVM(
+			vms,
+			vm.ID.String(),
+			vm.DefaultNic().IPAddress.String(),
+			"batch",
+			vms.queue,
+			vms.sshKeyPath)
 	}
 }
 
@@ -86,16 +88,42 @@ func (vms *vmSupervisor) delVM(id string) {
 	delete(vms.vms, id)
 }
 
+// Return true if the launching thread should lanuch a new VM. If the return
+// value is true, the caller must then call `launchComplete` after the launch
+// attempt is complete - regardless of the success.
+func (vms *vmSupervisor) getLaunchAuthorization() bool {
+	vms.lock.Lock()
+	defer vms.lock.Unlock()
+
+	if len(vms.vms) >= maxVMs {
+		return false
+	}
+
+	wanted := vms.queue.Length() - len(vms.vms) - vms.launching
+	if wanted <= 0 {
+		return false
+	}
+
+	vms.launching++
+	return true
+}
+
+func (vms *vmSupervisor) launchComplete() {
+	vms.lock.Lock()
+	defer vms.lock.Unlock()
+	vms.launching--
+}
+
 // ----------------------------------------------------------------------------
 
-func (vms *vmSupervisor) runCollectVMs() {
+func (vms *vmSupervisor) runCollector() {
 	for {
-		vms.runCollectVMsInner()
+		vms.collectVMs()
 		time.Sleep(2 * time.Minute)
 	}
 }
 
-func (vms *vmSupervisor) runCollectVMsInner() {
+func (vms *vmSupervisor) collectVMs() {
 	vms.collectedAt = time.Now()
 
 	vms.log("Getting list of running vms...")
@@ -116,9 +144,9 @@ func (vms *vmSupervisor) runCollectVMsInner() {
 
 // ----------------------------------------------------------------------------
 
-func (vms *vmSupervisor) runScaleUp() {
+func (vms *vmSupervisor) runLauncher() {
 	for {
-		spawned, err := vms.runScaleUpInner()
+		spawned, err := vms.attemptLaunch()
 		if err != nil {
 			time.Sleep(30 * time.Second)
 			continue
@@ -129,30 +157,11 @@ func (vms *vmSupervisor) runScaleUp() {
 	}
 }
 
-func (vms *vmSupervisor) runScaleUpInner() (bool, error) {
-	queueLen := vms.queue.Length()
-	numVMs := vms.getVMCount()
-
-	// How many to spawn?
-	N := 0
-	switch queueLen {
-	case 0:
-		// Do nothing.
-	case 1:
-		if numVMs == 0 {
-			N = 1
-		}
-	default:
-		N = queueLen/2 - numVMs + 1
-	}
-
-	if numVMs+N > maxVMs {
-		N = maxVMs - numVMs
-	}
-
-	if N <= 0 {
+func (vms *vmSupervisor) attemptLaunch() (bool, error) {
+	if !vms.getLaunchAuthorization() {
 		return false, nil
 	}
+	defer vms.launchComplete()
 
 	vms.log("Launching VMs...")
 
@@ -196,8 +205,6 @@ func (vms *vmSupervisor) DeleteVM(id string) error {
 		vms.log("Failed to delete vm %s: %v", id, err)
 		return err
 	}
-
-	// TODO: Wait for delete to take affect?
 
 	vms.delVM(id)
 	return nil

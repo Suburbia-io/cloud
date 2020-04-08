@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Suburbia-io/cloud/batch"
-	"github.com/exoscale/egoscale"
 )
 
 type vm struct {
@@ -24,16 +23,18 @@ type vm struct {
 }
 
 func runVM(
-	eVM egoscale.VirtualMachine,
 	supervisor iVMSupervisor,
+	id string,
+	addr string,
+	user string,
 	queue iQueue,
 	sshKeyPath string,
 ) {
 	vm := &vm{
 		supervisor: supervisor,
-		id:         eVM.ID.String(),
-		addr:       eVM.DefaultNic().IPAddress.String(),
-		user:       "batch",
+		id:         id,
+		addr:       addr,
+		user:       user,
 		queue:      queue,
 		sshKeyPath: sshKeyPath,
 	}

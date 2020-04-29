@@ -39,7 +39,7 @@ type vmSupervisor struct {
 }
 
 func runVMSupervisor(queue iQueue, apiKey, apiSecret, sshKeyPath string) {
-	cl := &vmSupervisor{
+	vms := &vmSupervisor{
 		sshKeyPath: sshKeyPath,
 		cl: egoscale.NewClient(
 			"https://api.exoscale.ch/compute",
@@ -48,9 +48,9 @@ func runVMSupervisor(queue iQueue, apiKey, apiSecret, sshKeyPath string) {
 		vms:   map[string]struct{}{},
 		queue: queue,
 	}
-	go cl.runCollector()
+	go vms.runCollector()
 	for i := 0; i < 16; i++ {
-		go cl.runLauncher()
+		go vms.runLauncher()
 	}
 }
 
@@ -95,7 +95,7 @@ func (vms *vmSupervisor) getLaunchAuthorization() bool {
 	vms.lock.Lock()
 	defer vms.lock.Unlock()
 
-	if len(vms.vms) >= maxVMs {
+	if len(vms.vms)+vms.launching >= maxVMs {
 		return false
 	}
 
@@ -147,6 +147,7 @@ func (vms *vmSupervisor) collectVMs() {
 // ----------------------------------------------------------------------------
 
 func (vms *vmSupervisor) runLauncher() {
+	vms.log("Running launcher...")
 	for {
 		spawned, err := vms.attemptLaunch()
 		if err != nil {

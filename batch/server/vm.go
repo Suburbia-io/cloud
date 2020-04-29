@@ -147,9 +147,6 @@ func (vm *vm) runTask() stateFunc {
 
 	buf, err := cmd.CombinedOutput()
 
-	result.Output = string(buf)
-	result.Code = cmd.ProcessState.ExitCode()
-
 	if err != nil {
 		// If the command ran but failed, that's OK.
 		if _, ok := err.(*exec.ExitError); !ok {
@@ -157,6 +154,9 @@ func (vm *vm) runTask() stateFunc {
 			return vm.stop
 		}
 	}
+
+	result.Output = string(buf)
+	result.Code = cmd.ProcessState.ExitCode()
 
 	return vm.getNextTask
 }
@@ -189,7 +189,7 @@ func (vm *vm) sshCmd(remoteCmd string, args ...interface{}) *exec.Cmd {
 		"-o", "ControlPath /tmp/_batch-ssh-socket-%r@%h:%p",
 		"-o", "StrictHostKeyChecking no",
 		"-o", "UserKnownHostsFile /dev/null",
-		"-o", "ConnectTimeout=10",
+		"-o", "ConnectTimeout=60",
 		vm.user+"@"+vm.addr,
 		fmt.Sprintf(remoteCmd, args...))
 }
@@ -209,7 +209,7 @@ func (vm *vm) scp(lPath, rPath string) error {
 		"-o", "ControlPath /tmp/_batch-ssh-socket-%r@%h:%p",
 		"-o", "StrictHostKeyChecking no",
 		"-o", "UserKnownHostsFile /dev/null",
-		"-o", "ConnectTimeout=10",
+		"-o", "ConnectTimeout=60",
 		lPath,
 		vm.user+"@"+vm.addr+":"+rPath)
 	return cmd.Run()
